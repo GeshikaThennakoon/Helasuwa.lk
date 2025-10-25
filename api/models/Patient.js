@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 
+
 const schema = mongoose.Schema;
 
 const patientSchema = new schema({
@@ -23,10 +24,8 @@ const patientSchema = new schema({
     type: String,
     required: true,
   },
-  password: {
-    type: String,
-    required: false,
-  },
+   // Hash this field, never return by default
+    password: { type: String, required: true, minlength: 8, select: false },
   phoneNo: {
     type: String,
     required: true,

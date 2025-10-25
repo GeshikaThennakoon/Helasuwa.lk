@@ -1,60 +1,52 @@
 const Patient = require("../models/Patient");
 const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs")
 //const secretKey = "hey";
 
 const { JWT_SECRET, JWT_TTL } = require('../Configurations/crypto');
 
 // Controller to add a new patient
-exports.addPatient = (req, res) => {
-  const {
-    email,
-    password,
-    firstName,
-    lastName,
-    gender,
-    dob,
-    civilStatus,
-    phone,
-    emergencyPhone,
-    gaurdianNIC,
-    gaurdianName,
-    gaurdianPhone,
-    height,
-    weight,
-    bloodGroup,
-    allergies,
-    medicalStatus,
-    insuranceNo,
-    insuranceCompany,
-  } = req.body;
+// Add new patient — hash password before saving
+exports.addPatient = async (req, res) => {
+  try {
+    const {
+      email, password, firstName, lastName, gender, dob, civilStatus, phone,
+      emergencyPhone, gaurdianNIC, gaurdianName, gaurdianPhone, height, weight,
+      bloodGroup, allergies, medicalStatus, insuranceNo, insuranceCompany,
+    } = req.body;
 
-  const newPatient = new Patient({
-    email,
-    firstName,
-    lastName,
-    dob,
-    gender,
-    password,
-    civilStatus,
-    phoneNo: phone,
-    emergencyPhone,
-    gaurdianName,
-    gaurdianNIC,
-    gaurdianPhone,
-    height,
-    weight,
-    bloodGroup,
-    allergies,
-    medicalStatus,
-    insuranceCompany,
-    insuranceNo,
-  });
+    // Required: hash the password
+    const hashed = await bcrypt.hash(password, 10);
 
-  newPatient
-    .save()
-    .then(() => res.json("Patient Added"))
-    .catch((err) => console.log(err));
+    const newPatient = new Patient({
+      email,
+      firstName,
+      lastName,
+      dob,
+      gender,
+      password: hashed,     // store hashed password
+      civilStatus,
+      phoneNo: phone,
+      emergencyPhone,
+      gaurdianName,
+      gaurdianNIC,
+      gaurdianPhone,
+      height,
+      weight,
+      bloodGroup,
+      allergies,
+      medicalStatus,
+      insuranceCompany,
+      insuranceNo,
+    });
+
+    await newPatient.save();
+    return res.status(201).json({ message: 'Patient Added' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
 };
 
 // Controller for login
@@ -82,22 +74,27 @@ exports.loginPatient = async (req, res) => {
   }
 };
 
-// Controller to verify JWT token
+
+
+
+// replace your checkToken with this:
 exports.checkToken = async (req, res) => {
-  const token = req.headers.authorization;
-  let email = null;
+  try {
+    const auth = req.headers.authorization || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : auth;
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
-  jwt.verify(token, secretKey, (error, decoded) => {
-    if (error) {
-      console.log(error);
-      return res.status(401).send("Unauthorized");
-    }
-    email = decoded.email;
-  });
+    const decoded = jwt.verify(token, JWT_SECRET); // <-- use JWT_SECRET
+    const patient = await Patient.findOne({ email: decoded.email });
+    if (!patient) return res.status(404).json({ error: 'Patient not found' });
 
-  const patient = await Patient.findOne({ email });
-  res.status(200).send({ rst: "checked", patient });
+    return res.status(200).json({ rst: 'checked', patient });
+  } catch (err) {
+    console.error(err);
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
 };
+
 
 // Controller to get patient by ID
 exports.getPatientById = async (req, res) => {
