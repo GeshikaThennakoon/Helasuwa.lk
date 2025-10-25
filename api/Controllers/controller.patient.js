@@ -1,7 +1,9 @@
 const Patient = require("../models/Patient");
 const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
-const secretKey = "hey";
+//const secretKey = "hey";
+
+const { JWT_SECRET, JWT_TTL } = require('../Configurations/crypto');
 
 // Controller to add a new patient
 exports.addPatient = (req, res) => {
