@@ -3,7 +3,8 @@ const router = require("express").Router();
 
 const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
-const secretKey = "hey";
+//const secretKey = "hey";
+const { JWT_SECRET, JWT_TTL } = require("../Configurations/crypto");
 
 router.route("/add").post((req, res) => {
   console.log("heyyy");
