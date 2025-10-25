@@ -1,6 +1,17 @@
 import axios from "axios";
 import React, { useState, useRef } from "react";
-import { QRCodeSVG } from "qrcode.react"; // Import QRCodeSVG
+import { QRCodeSVG } from "qrcode.react";
+
+// constant-time string comparison (avoids early-exit timing differences)
+function timingSafeEqualStr(a = "", b = "") {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
 
 const Signup = () => {
   const [email, setEmail] = useState("");
@@ -24,104 +35,86 @@ const Signup = () => {
 
   const [password, setPassword] = useState("");
   const [cpassword, setCpassword] = useState("");
-  const [qrCodeValue, setQrCodeValue] = useState(""); // Add this line to define qrCodeValue state
+  const [qrCodeValue, setQrCodeValue] = useState("");
 
-  const qrCodeRef = useRef(null); // Reference for the QR code canvas
+  const qrCodeRef = useRef(null);
 
-  const validateEmail = (email) => {
-    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-    return emailRegex.test(email);
-  };
+  const validateEmail = (email) =>
+    /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email);
 
-  const validatePassword = (tpassword) => {
-    const pattern = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
-    return pattern.test(tpassword);
-  };
+  const validatePassword = (tpassword) =>
+    /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/.test(tpassword);
 
-  const validatePhone = (phn) => {
-    const phoneNumberPattern = /^\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$/;
-    return phoneNumberPattern.test(phn);
-  };
+  const validatePhone = (phn) =>
+    /^\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$/.test(phn);
 
-  function createPatient(e) {
+  async function createPatient(e) {
     e.preventDefault();
 
-    if (validateEmail(email)) {
-      if (validatePassword(password)) {
-        if (validatePhone(phone)) {
-          if (cpassword === password) {
-            if (validatePhone(emergencyPhone)) {
-              const newPatient = {
-                email,
-                password,
-                firstName,
-                lastName,
-                dob,
-                gender,
-                civilStatus,
-                phone,
-                emergencyPhone,
-                guardianNIC,
-                guardianName,
-                guardianPhone,
-                height,
-                weight,
-                bloodGroup,
-                allergies,
-                medicalStatus,
-                insuranceNo,
-                insuranceCompany,
-              };
+    if (!validateEmail(email)) return alert("Invalid Email");
+    if (!validatePassword(password))
+      return alert(
+        "Password must contain 8+ chars incl. 1 lower, 1 upper, 1 number, 1 special"
+      );
+    if (!validatePhone(phone)) return alert("Invalid Phone Number");
+    if (!timingSafeEqualStr(cpassword, password))
+      return alert("Passwords don't match");
+    if (!validatePhone(emergencyPhone)) return alert("Invalid Emergency Phone No!");
 
-              // Generate QR code data from patient details
-              const qrData = JSON.stringify(newPatient);
-              setQrCodeValue(qrData); // Set the QR code value
+    const newPatient = {
+      email,
+      password, // backend will hash; do NOT include in QR below
+      firstName,
+      lastName,
+      dob,
+      gender,
+      civilStatus,
+      phone,
+      emergencyPhone,
+      guardianNIC,
+      guardianName,
+      guardianPhone,
+      height,
+      weight,
+      bloodGroup,
+      allergies,
+      medicalStatus,
+      insuranceNo,
+      insuranceCompany,
+    };
 
-              axios
-                .post("http://localhost:8070/patient/add/", newPatient)
-                .then((res) => {
-                  if (res.data === "exist") {
-                    alert("Email already exists");
-                  } else {
-                    alert("Patient Created");
-                    //window.location.href = "/patientLogin";
-                  }
-                })
-                .catch((err) => {
-                  alert(err);
-                });
-            } else {
-              alert("Invalid Emergency Phone No!");
-            }
-          } else {
-            alert("Passwords don't match");
-          }
-        } else {
-          alert("Invalid Phone Number");
-        }
+    // Generate a NON-sensitive QR payload (no password/PII like medicalStatus)
+    const qrData = {
+      email,
+      firstName,
+      lastName,
+      dob,
+      bloodGroup,
+    };
+    setQrCodeValue(JSON.stringify(qrData));
+
+    try {
+      const res = await axios.post("http://localhost:8070/patient/add/", newPatient);
+      if (res.data === "exist") {
+        alert("Email already exists");
       } else {
-        alert(
-          "Password must contain 8 characters including 1 lowercase letter, 1 uppercase letter, 1 number, and at least 1 special character"
-        );
+        alert("Patient Created");
+        // window.location.href = "/patientLogin";
       }
-    } else {
-      alert("Invalid Email");
+    } catch (err) {
+      alert(err?.response?.data?.error || "Registration failed");
     }
   }
 
-const downloadQRCode = () => {
-    const canvas = qrCodeRef.current.querySelector("canvas");
-    if (canvas) {
-      const pngUrl = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      link.href = pngUrl;
-      link.download = "qr-code.png";
-      link.click();
-    } else {
-      alert("QR code not generated yet.");
-    }
+  const downloadQRCode = () => {
+    const canvas = qrCodeRef.current?.querySelector("canvas");
+    if (!canvas) return alert("QR code not generated yet.");
+    const pngUrl = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = pngUrl;
+    link.download = "qr-code.png";
+    link.click();
   };
-
 
   return (
     <div className="bg-gray-100 min-h-screen flex items-center justify-center">
@@ -130,79 +123,26 @@ const downloadQRCode = () => {
         <form onSubmit={createPatient}>
           {/* Patient Details */}
           <div className="mb-4">
-            <input
-              className="input-fields w-full p-2 border rounded mb-3"
-              type="text"
-              placeholder="First Name"
-              onChange={(e) => setFirstName(e.target.value)}
-              required
-            />
-            <input
-              className="input-fields w-full p-2 border rounded mb-3"
-              type="text"
-              placeholder="Last Name"
-              onChange={(e) => setLastName(e.target.value)}
-              required
-            />
-            <input
-              className="input-fields w-full p-2 border rounded mb-3"
-              type="email"
-              placeholder="Email"
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <input
-              className="input-fields w-full p-2 border rounded mb-3"
-              type="number"
-              placeholder="Phone No"
-              onChange={(e) => setPhone(e.target.value)}
-              required
-            />
+            <input className="input-fields w-full p-2 border rounded mb-3" type="text" placeholder="First Name" onChange={(e) => setFirstName(e.target.value)} required />
+            <input className="input-fields w-full p-2 border rounded mb-3" type="text" placeholder="Last Name" onChange={(e) => setLastName(e.target.value)} required />
+            <input className="input-fields w-full p-2 border rounded mb-3" type="email" placeholder="Email" onChange={(e) => setEmail(e.target.value)} required />
+            <input className="input-fields w-full p-2 border rounded mb-3" type="tel" placeholder="Phone No" onChange={(e) => setPhone(e.target.value)} required />
             <label className="block mb-1">Date of Birth</label>
-            <input
-              className="input-fields w-full p-2 border rounded mb-3"
-              type="date"
-              onChange={(e) => setDob(e.target.value)}
-              required
-            />
-            <select
-              className="input-fields w-full p-2 border rounded mb-3"
-              onChange={(e) => setGender(e.target.value)}
-              required
-            >
+            <input className="input-fields w-full p-2 border rounded mb-3" type="date" onChange={(e) => setDob(e.target.value)} required />
+            <select className="input-fields w-full p-2 border rounded mb-3" onChange={(e) => setGender(e.target.value)} required>
               <option value="">Gender</option>
               <option value="Male">Male</option>
               <option value="Female">Female</option>
             </select>
-            <select
-              className="input-fields w-full p-2 border rounded mb-3"
-              onChange={(e) => setCivilStatus(e.target.value)}
-              required
-            >
+            <select className="input-fields w-full p-2 border rounded mb-3" onChange={(e) => setCivilStatus(e.target.value)} required>
               <option value="">Civil Status</option>
               <option value="Married">Married</option>
               <option value="Single">Single</option>
               <option value="Other">Other</option>
             </select>
-            <input
-              className="input-fields w-full p-2 border rounded mb-3"
-              type="number"
-              placeholder="Height In cm"
-              onChange={(e) => setHeight(e.target.value)}
-              required
-            />
-            <input
-              className="input-fields w-full p-2 border rounded mb-3"
-              type="number"
-              placeholder="Weight In Kg"
-              onChange={(e) => setWeight(e.target.value)}
-              required
-            />
-            <select
-              className="input-fields w-full p-2 border rounded mb-3"
-              onChange={(e) => setBloodGroup(e.target.value)}
-              required
-            >
+            <input className="input-fields w-full p-2 border rounded mb-3" type="number" placeholder="Height In cm" onChange={(e) => setHeight(e.target.value)} required />
+            <input className="input-fields w-full p-2 border rounded mb-3" type="number" placeholder="Weight In Kg" onChange={(e) => setWeight(e.target.value)} required />
+            <select className="input-fields w-full p-2 border rounded mb-3" onChange={(e) => setBloodGroup(e.target.value)} required>
               <option value="">Blood Group</option>
               <option value="A+">A positive</option>
               <option value="A-">A negative</option>
@@ -213,108 +153,41 @@ const downloadQRCode = () => {
               <option value="AB+">AB positive</option>
               <option value="AB-">AB negative</option>
             </select>
-            <input
-              className="input-fields w-full p-2 border rounded mb-3"
-              type="text"
-              placeholder="Medical Status Eg: Cancer Patient"
-              onChange={(e) => setMedicalStatus(e.target.value)}
-              required
-            />
-            <input
-              className="input-fields w-full p-2 border rounded mb-3"
-              type="text"
-              placeholder="Allergies"
-              onChange={(e) => setAllergies(e.target.value)}
-              required
-            />
-            <input
-              className="input-fields w-full p-2 border rounded mb-3"
-              type="number"
-              placeholder="Emergency Contact No"
-              onChange={(e) => setEmergencyPhone(e.target.value)}
-              required
-            />
-              <input
-              className="input-fields w-full p-3 border border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200 mb-3"
-              type="text"
-              placeholder="Insurance No"
-              onChange={(e) => setInsuranceNo(e.target.value)}
-            />
-            <input
-              className="input-fields w-full p-3 border border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200 mb-3"
-              type="text"
-              placeholder="Insurance Company"
-              onChange={(e) => setInsuranceCompany(e.target.value)}
-            />
+            <input className="input-fields w-full p-2 border rounded mb-3" type="text" placeholder="Medical Status Eg: Cancer Patient" onChange={(e) => setMedicalStatus(e.target.value)} required />
+            <input className="input-fields w-full p-2 border rounded mb-3" type="text" placeholder="Allergies" onChange={(e) => setAllergies(e.target.value)} required />
+            <input className="input-fields w-full p-2 border rounded mb-3" type="tel" placeholder="Emergency Contact No" onChange={(e) => setEmergencyPhone(e.target.value)} required />
+            <input className="input-fields w-full p-3 border border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200 mb-3" type="text" placeholder="Insurance No" onChange={(e) => setInsuranceNo(e.target.value)} />
+            <input className="input-fields w-full p-3 border border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200 mb-3" type="text" placeholder="Insurance Company" onChange={(e) => setInsuranceCompany(e.target.value)} />
           </div>
 
           {/* Guardian Details */}
           <h4 className="font-semibold mb-2">Guardian Details</h4>
-          <input
-            className="input-fields w-full p-2 border rounded mb-3"
-            type="text"
-            placeholder="Guardian Name"
-            onChange={(e) => setGuardianName(e.target.value)}
-          />
-          <input
-            className="input-fields w-full p-2 border rounded mb-3"
-            type="number"
-            placeholder="Guardian NIC"
-            onChange={(e) => setGuardianNIC(e.target.value)}
-          />
-          <input
-            className="input-fields w-full p-2 border rounded mb-3"
-            type="number"
-            placeholder="Guardian Phone"
-            onChange={(e) => setGuardianPhone(e.target.value)}
-          />
-         
+          <input className="input-fields w-full p-2 border rounded mb-3" type="text" placeholder="Guardian Name" onChange={(e) => setGuardianName(e.target.value)} />
+          <input className="input-fields w-full p-2 border rounded mb-3" type="text" placeholder="Guardian NIC" onChange={(e) => setGuardianNIC(e.target.value)} />
+          <input className="input-fields w-full p-2 border rounded mb-3" type="tel" placeholder="Guardian Phone" onChange={(e) => setGuardianPhone(e.target.value)} />
 
           {/* Account Information */}
           <h4 className="font-semibold mb-2">Account Information</h4>
-          <input
-            className="input-fields w-full p-2 border rounded mb-3"
-            type="password"
-            placeholder="Password"
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <input
-            className="input-fields w-full p-2 border rounded mb-3"
-            type="password"
-            placeholder="Confirm Password"
-            onChange={(e) => setCpassword(e.target.value)}
-            required
-          />
+          <input className="input-fields w-full p-2 border rounded mb-3" type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} required />
+          <input className="input-fields w-full p-2 border rounded mb-3" type="password" placeholder="Confirm Password" onChange={(e) => setCpassword(e.target.value)} required />
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            className="bg-blue-500 text-white font-bold py-2 px-4 rounded w-full"
-          >
+          <button type="submit" className="bg-blue-500 text-white font-bold py-2 px-4 rounded w-full">
             Submit
           </button>
         </form>
 
-      
         {qrCodeValue && (
           <div className="mt-6 text-center" ref={qrCodeRef}>
             <QRCodeSVG value={qrCodeValue} size={128} />
-            
             <p className="mt-2">Your QR Code</p>
-            <button
-              onClick={downloadQRCode}
-              className="bg-green-500 text-white font-bold py-2 px-4 rounded mt-2"
-            >
+            <button onClick={downloadQRCode} className="bg-green-500 text-white font-bold py-2 px-4 rounded mt-2">
               Download QR Code
             </button>
           </div>
         )}
-          
       </div>
     </div>
   );
 };
 
 export default Signup;
-
