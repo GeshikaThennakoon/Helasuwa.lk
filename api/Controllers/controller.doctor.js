@@ -3,7 +3,8 @@
 const Doctor = require("../models/Doctor");
 const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
-const secretKey = "hey";
+//const secretKey = "hey";
+const { JWT_SECRET, JWT_TTL } = require('../Configurations/crypto');
 
 // Function to add a new doctor
 exports.addDoctor = (req, res) => {
