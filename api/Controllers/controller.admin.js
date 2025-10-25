@@ -2,7 +2,9 @@
 const Admin = require("../models/Admin");
 const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
-const secretKey = 'hey';
+
+//const secretKey = 'hey';
+const { JWT_SECRET, JWT_TTL } = require('../Configurations/crypto');
 
 // Nodemailer transporter setup
 const transporter = nodemailer.createTransport({
@@ -14,6 +16,9 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EmailPass,
   },
 });
+
+
+
 
 // Add new admin
 exports.addAdmin = (req, res) => {
