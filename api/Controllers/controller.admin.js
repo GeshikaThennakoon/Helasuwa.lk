@@ -4,7 +4,7 @@ const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
 
 //const secretKey = 'hey';
-const { JWT_SECRET, JWT_TTL } = require('../Configurations/crypto');
+const { secretKey } = require('../Configurations/crypto');
 
 // Nodemailer transporter setup
 const transporter = nodemailer.createTransport({

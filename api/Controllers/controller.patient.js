@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs")
 //const secretKey = "hey";
 
-const { JWT_SECRET, JWT_TTL } = require('../Configurations/crypto');
+const { JWT_SECRET} = require('../Configurations/crypto');
 
 // Controller to add a new patient
 // Add new patient — hash password before saving

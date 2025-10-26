@@ -5,4 +5,4 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
   throw new Error('Secure JWT_SECRET (>=256-bit) is required');
 }
 
-module.exports = { JWT_SECRET, JWT_TTL };
+module.exports = { secretKey, JWT_TTL };
